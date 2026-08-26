@@ -1,0 +1,300 @@
+{"name": "все языки",
+    "code": "root",
+    "type": "root",
+    "children": [
+        {
+            "name": "чукотка",
+            "code": "chkt",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "камчатка",
+            "code": "kmch",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "русский север",
+            "code": "rnor",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "кольский",
+            "code": "kola",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "якутия",
+            "code": "yaku",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "финляндия",
+            "code": "finl",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "сибирь",
+            "code": "sib",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "балтика",
+            "code": "balt",
+            "type": "регион",
+            "children": []
+        },
+        {
+            "name": "палеоазиатские",
+            "code": "pls",
+            "type": "группа",
+            "children": [
+                {
+                    "name": "чукотско-камчатские",
+                    "code": "chuk",
+                    "type": "подгруппа",
+                    "children": [
+                        {"name": "чукотский", "code": "ckt", "type": "язык"},
+                        {"name": "ительменский", "code": "itl", "type": "язык"},
+                        {"name": "корякский", "code": "kpy", "type": "язык"}
+                    ]
+                },
+                {
+                    "name": "енисейские",
+                    "code": "yeni",
+                    "type": "подгруппа",
+                    "children": [
+                        {"name": "кетский", "code": "ket", "type": "язык"}
+                    ]
+                },
+                {
+                    "name": "юкагирский",
+                    "code": "yuka",
+                    "type": "язык"
+                },
+                {
+                    "name": "нивхский",
+                    "code": "niv",
+                    "type": "подгруппа",
+                    "children": []
+                },
+                {
+                    "name": "айнский",
+                    "code": "ain",
+                    "type": "язык"
+                }
+            ]
+        },
+        {
+            "name": "уральские",
+            "code": "ural",
+            "type": "семья",
+            "children": [
+                {
+                    "name": "самодийские",
+                    "code": "samo",
+                    "type": "группа",
+                    "children": [
+                        {
+                            "name": "северные самодийские",
+                            "code": "nsamo",
+                            "type": "подгруппа",
+                            "children": [
+                                {"name": "нганасанский", "code": "nio", "type": "язык"},
+                                {"name": "энецкий", "code": "enet", "type": "язык"},
+                                {
+                                    "name": "ненецкие",
+                                    "code": "nene",
+                                    "type": "подгруппа",
+                                    "children": [
+                                        {"name": "тундровый ненецкий", "code": "yrk", "type": "язык"},
+                                        {"name": "лесной ненецкий", "code": "fore", "type": "язык"}
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "южные самодийские",
+                            "code": "ssamo",
+                            "type": "подгруппа",
+                            "children": [
+                                {"name": "селькупский", "code": "sel", "type": "язык"}
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "саамские",
+                    "code": "saam",
+                    "type": "группа",
+                    "children": [
+                        {"name": "кильдинский саамский", "code": "sjd", "type": "язык"},
+                        {"name": "инари саамский", "code": "smn", "type": "язык"},
+                        {"name": "северносаамский", "code": "sme", "type": "язык"}
+                    ]
+                },
+                {
+                    "name": "финно-угорские",
+                    "code": "fugo",
+                    "type": "группа",
+                    "children": [
+                        {
+                            "name": "прибалтийско-финские",
+                            "code": "finn",
+                            "type": "подгруппа",
+                            "children": [
+                                {"name": "карельский", "code": "krl", "type": "язык"},
+                                {
+                                    "name": "финский",
+                                    "code": "fin",
+                                    "type": "язык",
+                                    "children": [
+                                        {"name": "ингерманландский финский", "code": "ink", "type": "диалект"}
+                                    ]
+                                },
+                                {"name": "веппский", "code": "vep", "type": "язык"},
+                                {"name": "эстонский", "code": "ekk", "type": "язык"}
+                            ]
+                        },
+                        {
+                            "name": "мордовские",
+                            "code": "mord",
+                            "type": "подгруппа",
+                            "children": [
+                                {"name": "мокшанский", "code": "mdf", "type": "язык"}
+                            ]
+                        },
+                        {
+                            "name": "марийские",
+                            "code": "mari",
+                            "type": "подгруппа",
+                            "children": []
+                        },
+                        {
+                            "name": "пермские",
+                            "code": "perm",
+                            "type": "подгруппа",
+                            "children": [
+                                {"name": "коми", "code": "kom", "type": "язык"},
+                                {"name": "бесермянский удмуртский", "code": "udm", "type": "язык"}
+                            ]
+                        },
+                        {
+                            "name": "угорские",
+                            "code": "ugr",
+                            "type": "подгруппа",
+                            "children": [
+                                {
+                                    "name": "хантыйские",
+                                    "code": "khan",
+                                    "type": "подгруппа",
+                                    "children": [
+                                        {"name": "сургутский хантыйский", "code": "surg", "type": "диалект"}
+                                    ]
+                                },
+                                {
+                                    "name": "мансийские",
+                                    "code": "mans",
+                                    "type": "подгруппа",
+                                    "children": [
+                                        {"name": "северный мансийский", "code": "mns", "type": "диалект"}
+                                    ]
+                                },
+                                {"name": "венгерский", "code": "hun", "type": "язык"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "эскимосско-алеутские",
+            "code": "eski",
+            "type": "семья",
+            "children": [
+                {
+                    "name": "алеутский",
+                    "code": "ale",
+                    "type": "группа",
+                    "children": [
+                        {"name": "медновский алеутский", "code": "mud", "type": "диалект"}
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "тюркские",
+            "code": "turk",
+            "type": "семья",
+            "children": [
+                {"name": "тубаларский", "code": "tuba", "type": "язык"},
+                {"name": "чакланский", "code": "chel", "type": "язык"},
+                {"name": "долганский", "code": "dlg", "type": "язык"},
+                {"name": "якутский", "code": "sah", "type": "язык"},
+                {
+                    "name": "татарский",
+                    "code": "tat",
+                    "type": "группа",
+                    "children": [
+                        {"name": "барабинско-татарский", "code": "bara", "type": "диалект"},
+                        {"name": "мишарский татарский", "code": "tmi", "type": "диалект"}
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "балтийские",
+            "code": "bal",
+            "type": "семья",
+            "children": []
+        },
+        {
+            "name": "монгольские",
+            "code": "mong",
+            "type": "семья",
+            "children": []
+        },
+        {
+            "name": "тунгусо-маньчжурские",
+            "code": "tung",
+            "type": "семья",
+            "children": [
+                {"name": "эвенкийский", "code": "evn", "type": "язык"},
+                {"name": "эвенский", "code": "eve", "type": "язык"},
+                {"name": "ульчский", "code": "ulc", "type": "язык"},
+                {"name": "удэгейский", "code": "ude", "type": "язык"}
+            ]
+        },
+        {
+            "name": "шведский",
+            "code": "swe",
+            "type": "язык"
+        },
+        {
+            "name": "норвежский",
+            "code": "nor",
+            "type": "язык"
+        },
+        {
+            "name": "русский",
+            "code": "rus",
+            "type": "язык"
+        },
+        {
+            "name": "японский",
+            "code": "jap",
+            "type": "язык"
+        },
+        {
+            "name": "английский",
+            "code": "eng",
+            "type": "язык"
+        }
+    ]
+}
