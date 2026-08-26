@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/db";
-import { Book, BookCreate } from "@/lib/models/Book";
+import { Book, BookCreate, buildLanguageDetails } from "@/lib/models/Book";
 import { syncReferenceData } from "@/lib/syncReferenceData";
 
 // GET /api/books?q=...&tag=...&lang=...
@@ -205,10 +205,18 @@ export async function POST(
       );
     }
 
+    const tags = data.tags || [];
+    const languages = data.languages || [];
+    const languageCodes = data.languageCodes || [];
+
     const book: Book = {
       ...data,
+      tags,
+      languages,
+      languageCodes,
+      languageDetails: buildLanguageDetails(languages, languageCodes),
+      isAvailable: true,
       createdAt: new Date(),
-      updatedAt: new Date(),
     };
 
     const result = await db

@@ -268,8 +268,10 @@ export function LanguageTree({
               />
 
               <span className="truncate text-sm">
-                {node.name}
-              </span>
+                {node.code === "root"
+                    ? "Все языки и места"
+                    : node.name}
+                </span>
             </label>
           </div>
 
@@ -290,7 +292,7 @@ export function LanguageTree({
   if (loading) {
     return (
       <div className="w-full rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
-        Загружаем языки...
+        Загружаем языки и места...
       </div>
     );
   }
@@ -300,7 +302,7 @@ export function LanguageTree({
       {/* Заголовок */}
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-medium">
-          Языки
+          Языки и места
           {value.length > 0 &&
             ` (${value.length})`}
         </span>
