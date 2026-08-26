@@ -5,105 +5,205 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import type { Tag } from "@/lib/models/Tag";
-import type { Language } from "@/lib/models/Language";
+import { LanguageTree } from "@/components/LanguageTree";
 
 interface TagLanguageFilterProps {
   initialTag?: string;
   initialLang?: string;
 }
 
-// Фильтр по тегу и языку поверх текстового поиска. Списки подтягиваются из
-// вспомогательных справочных коллекций tags/languages (см. /api/tags,
-// /api/languages), которые пересобирает scripts/csv-to-mongo.ts — как в
-// arcticlab_lib. Выбор пишется в URL (?tag=...&lang=...), поэтому фильтром
-// можно поделиться ссылкой и он переживает переход по страницам.
 export function TagLanguageFilter({
   initialTag = "",
   initialLang = "",
 }: TagLanguageFilterProps) {
   const [tags, setTags] = useState<Tag[]>([]);
-  const [languages, setLanguages] = useState<Language[]>([]);
   const [loading, setLoading] = useState(true);
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  const selectedTags = initialTag
+    ? initialTag.split(",").filter(Boolean)
+    : [];
+
+  const selectedLanguages = initialLang
+    ? initialLang.split(",").filter(Boolean)
+    : [];
+
   useEffect(() => {
-    Promise.all([
-      fetch("/api/tags").then((r) => (r.ok ? r.json() : { tags: [] })),
-      fetch("/api/languages").then((r) => (r.ok ? r.json() : { languages: [] })),
-    ])
-      .then(([tagsData, langData]) => {
-        setTags(tagsData.tags || []);
-        setLanguages(langData.languages || []);
+    fetch("/api/tags")
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Не удалось загрузить теги");
+        }
+
+        return response.json();
+      })
+      .then((data) => {
+        setTags(data.tags || []);
       })
       .catch((error) => {
-        console.error("Error fetching filters:", error);
+        console.error("Tags error:", error);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  const updateParam = (key: "tag" | "lang", value: string) => {
+  const updateFilters = (
+    languages: string[],
+    tagList: string[]
+  ) => {
     const params = new URLSearchParams(searchParams);
-    if (value) {
-      params.set(key, value);
+
+    if (languages.length > 0) {
+      params.set("lang", languages.join(","));
     } else {
-      params.delete(key);
+      params.delete("lang");
     }
+
+    if (tagList.length > 0) {
+      params.set("tag", tagList.join(","));
+    } else {
+      params.delete("tag");
+    }
+
     params.delete("page");
-    router.push(`/?${params.toString()}`, { scroll: false });
+
+    router.push(`/?${params.toString()}`, {
+      scroll: false,
+    });
+  };
+
+  const toggleTag = (tagName: string) => {
+    const nextTags = selectedTags.includes(tagName)
+      ? selectedTags.filter((tag) => tag !== tagName)
+      : [...selectedTags, tagName];
+
+    updateFilters(selectedLanguages, nextTags);
   };
 
   const clearFilters = () => {
     const params = new URLSearchParams(searchParams);
+
     params.delete("tag");
     params.delete("lang");
     params.delete("page");
-    router.push(`/?${params.toString()}`, { scroll: false });
+
+    router.push(`/?${params.toString()}`, {
+      scroll: false,
+    });
   };
 
-  const hasActiveFilters = Boolean(initialTag || initialLang);
+  const hasActiveFilters =
+    selectedTags.length > 0 ||
+    selectedLanguages.length > 0;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl mx-auto mt-3">
-      <select
-        value={initialTag}
-        disabled={loading}
-        onChange={(e) => updateParam("tag", e.target.value)}
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
-      >
-        <option value="">Все теги</option>
-        {tags.map((tag) => (
-          <option key={tag.name} value={tag.name}>
-            {tag.name} ({tag.bookCount})
-          </option>
-        ))}
-      </select>
+    <div className="w-full max-w-5xl mx-auto mt-3">
+      {/* На компьютере блоки рядом, на мобильном друг под другом */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {/* ==================== ТЕГИ ==================== */}
 
-      <select
-        value={initialLang}
-        disabled={loading}
-        onChange={(e) => updateParam("lang", e.target.value)}
-        className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
-      >
-        <option value="">Все языки</option>
-        {languages.map((lang) => (
-          <option key={lang.code} value={lang.code}>
-            {lang.name} ({lang.bookCount})
-          </option>
-        ))}
-      </select>
+        <div className="w-full rounded-md border bg-background">
+          <div className="border-b px-3 py-2">
+            <span className="text-sm font-medium">
+              Теги
+              {selectedTags.length > 0 &&
+                ` (${selectedTags.length})`}
+            </span>
+          </div>
+
+          <div className="max-h-96 overflow-y-auto p-2">
+            {loading ? (
+              <div className="text-sm text-muted-foreground">
+                Загружаем теги...
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                {tags.map((tag) => {
+                  const selected =
+                    selectedTags.includes(tag.name);
+
+                  return (
+                    <label
+                      key={tag.name}
+                      className={`flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer text-sm ${
+                        selected
+                          ? "bg-accent text-accent-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleTag(tag.name)}
+                        className="h-4 w-4 shrink-0"
+                      />
+
+                      <span className="truncate">
+                        {tag.name}
+                      </span>
+
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {tag.bookCount}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {selectedTags.length > 0 && (
+            <div className="border-t px-3 py-2">
+              <button
+                type="button"
+                onClick={() =>
+                  updateFilters(
+                    selectedLanguages,
+                    []
+                  )
+                }
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Сбросить теги
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ==================== ЯЗЫКИ ==================== */}
+
+        <div className="w-full">
+          <LanguageTree
+            value={selectedLanguages}
+            onChange={(languages) =>
+              updateFilters(
+                languages,
+                selectedTags
+              )
+            }
+            disabled={loading}
+          />
+        </div>
+      </div>
+
+      {/* ==================== СБРОС ВСЕХ ФИЛЬТРОВ ==================== */}
 
       {hasActiveFilters && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={clearFilters}
-          className="h-9 text-muted-foreground"
-        >
-          <X className="h-3 w-3 mr-1" />
-          Сбросить фильтры
-        </Button>
+        <div className="flex justify-center mt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="h-9 text-muted-foreground"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Сбросить все фильтры
+          </Button>
+        </div>
       )}
     </div>
   );

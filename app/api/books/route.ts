@@ -1,156 +1,246 @@
-import { NextRequest, NextResponse } from 'next/server'
-import clientPromise from '@/lib/db'
-import { Book, BookCreate } from '@/lib/models/Book'
+import { NextRequest, NextResponse } from "next/server";
+import { ObjectId } from "mongodb";
+import clientPromise from "@/lib/db";
+import { Book, BookCreate } from "@/lib/models/Book";
+import { syncReferenceData } from "@/lib/syncReferenceData";
 
-// GET /api/books?q=...&tag=...&lang=...&admin=true&page=1
-//   q     — полнотекстовый поиск (название/автор/издательство/теги/языки)
-//   tag   — фильтр по тегу (книга содержит тег в массиве tags[])
-//   lang  — фильтр по коду языка (книга содержит код в массиве languageCodes[])
-// Можно комбинировать q + tag + lang одновременно.
+// GET /api/books?q=...&tag=...&lang=...
+//
+// tag и lang могут содержать несколько значений через запятую:
+// ?tag=история,научпоп
+// ?lang=ckt,kpy,itl
+//
+// Книга подходит, если содержит ХОТЯ БЫ ОДИН
+// из выбранных тегов/языков.
+
 export async function GET(request: NextRequest) {
   try {
-    const client = await clientPromise
-    const db = client.db('library')
-    const searchParams = request.nextUrl.searchParams
-    const query = searchParams.get('q') || ''
-    const tag = searchParams.get('tag') || ''
-    const lang = searchParams.get('lang') || ''
-    const page = parseInt(searchParams.get('page') || '1')
-    const isAdmin = searchParams.get('admin') === 'true'
-    const limit = isAdmin ? 100 : 8
-    const skip = isAdmin ? 0 : (page - 1) * limit
+    const client = await clientPromise;
+    const db = client.db("library");
 
-    const andConditions: Record<string, unknown>[] = []
+    const searchParams = request.nextUrl.searchParams;
 
+    const query = searchParams.get("q") || "";
+    const tagParam = searchParams.get("tag") || "";
+    const langParam = searchParams.get("lang") || "";
+
+    const userEmail = request.headers.get("email");
+
+    // Преобразуем строки:
+    // "история,научпоп" -> ["история", "научпоп"]
+    const selectedTags = tagParam
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const selectedLanguages = langParam
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    const andConditions: Record<string, unknown>[] = [];
+
+    // Поиск
     if (query) {
       andConditions.push({
         $or: [
-          { title: { $regex: query, $options: 'i' } },
-          { author: { $regex: query, $options: 'i' } },
-          { publisher_year: { $regex: query, $options: 'i' } },
-          { tags: { $regex: query, $options: 'i' } },
-          { languages: { $regex: query, $options: 'i' } },
+          { title: { $regex: query, $options: "i" } },
+          { author: { $regex: query, $options: "i" } },
+          { publisher_year: { $regex: query, $options: "i" } },
+          { tags: { $regex: query, $options: "i" } },
+          { languages: { $regex: query, $options: "i" } },
         ],
-      })
+      });
     }
 
-    if (tag) {
-      andConditions.push({ tags: tag })
-    }
-
-    if (lang) {
-      andConditions.push({ languageCodes: lang })
-    }
-
-    const filter = andConditions.length > 0 ? { $and: andConditions } : {}
-
-    let books
-    if (isAdmin) {
-      books = await db.collection('books').aggregate([
-        { $match: filter },
-        {
-          $lookup: {
-            from: 'borrows',
-            let: { bookId: '$_id' },
-            pipeline: [
-              {
-                $match: {
-                  $expr: { $eq: ['$bookId', '$$bookId'] },
-                  status: 'active'
-                }
-              },
-              {
-                $lookup: {
-                  from: 'users',
-                  localField: 'userId',
-                  foreignField: '_id',
-                  as: 'user'
-                }
-              },
-              { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
-              {
-                $project: {
-                  userName: 1,
-                  userEmail: 1,
-                  userTelegram: 1,
-                  borrowDate: 1,
-                  dueDate: 1,
-                  'user.firstName': 1,
-                  'user.lastName': 1,
-                  'user.email': 1,
-                  'user.telegram': 1
-                }
-              }
-            ],
-            as: 'activeBorrows'
-          }
+    // Несколько тегов:
+    // книга подходит, если у неё есть ХОТЯ БЫ ОДИН
+    // из выбранных тегов.
+    if (selectedTags.length > 0) {
+      andConditions.push({
+        tags: {
+          $in: selectedTags,
         },
-        {
-          $addFields: {
-            currentHolder: { $arrayElemAt: ['$activeBorrows', 0] }
-          }
-        },
-        { $sort: { title: 1 } }
-      ]).toArray()
-    } else {
-      books = await db
-        .collection<Book>('books')
-        .find(filter)
-        .sort({ title: 1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray()
+      });
     }
 
-    const total = await db.collection<Book>('books').countDocuments(filter)
+    // Несколько языков:
+    // книга подходит, если у неё есть ХОТЯ БЫ ОДИН
+    // из выбранных языков.
+    if (selectedLanguages.length > 0) {
+      andConditions.push({
+        languageCodes: {
+          $in: selectedLanguages,
+        },
+      });
+    }
 
+    const filter =
+      andConditions.length > 0
+        ? { $and: andConditions }
+        : {};
+
+    // Определяем, админ ли пользователь.
+    let isAdmin = false;
+
+    if (userEmail) {
+      const user = await db
+        .collection("users")
+        .findOne({
+          email: userEmail,
+        });
+
+      isAdmin = user?.isAdmin === true;
+    }
+
+    // Админ получает больше книг.
+    // Обычный пользователь получает 8.
+    const limit = isAdmin ? 100 : 8;
+
+    const books = await db
+      .collection<Book>("books")
+      .find(filter)
+      .sort({ title: 1 })
+      .limit(limit)
+      .toArray();
+
+    // Для админа добавляем информацию
+    // о пользователе, который взял книгу.
     if (isAdmin) {
-      return NextResponse.json({
-        books,
-        totalBooks: total
-      })
-    } else {
-      const totalPages = Math.ceil(total / limit)
-      return NextResponse.json({
-        books,
-        pagination: {
-          currentPage: page,
-          totalPages,
-          totalBooks: total,
-          hasNext: page < totalPages,
-          hasPrev: page > 1
+      const users = await db
+        .collection("users")
+        .find({
+          borrowedBooks: {
+            $in: books
+              .map((book) => book._id)
+              .filter(Boolean),
+          },
+        })
+        .project({
+          email: 1,
+          firstName: 1,
+          lastName: 1,
+          telegram: 1,
+          borrowedBooks: 1,
+        })
+        .toArray();
+
+      const booksWithBorrower = books.map(
+        (book) => {
+          const borrower = users.find(
+            (user) =>
+              user.borrowedBooks?.some(
+                (id: ObjectId) =>
+                  id.equals(book._id!)
+              )
+          );
+
+          return {
+            ...book,
+            borrower: borrower
+              ? {
+                  email: borrower.email,
+                  firstName:
+                    borrower.firstName,
+                  lastName:
+                    borrower.lastName,
+                  telegram:
+                    borrower.telegram,
+                }
+              : null,
+          };
         }
-      })
+      );
+
+      return NextResponse.json({
+        books: booksWithBorrower,
+      });
     }
+
+    return NextResponse.json({
+      books,
+    });
   } catch (error) {
-    console.error('Books API error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error(
+      "Books API error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error: "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const client = await clientPromise
-    const db = client.db('library')
-    const bookData: BookCreate = await request.json()
+// POST /api/books
+//
+// Добавляет новую книгу.
+// После добавления автоматически пересобираются
+// коллекции tags и languages.
 
-    const book: Book = {
-      ...bookData,
-      tags: bookData.tags || [],
-      languages: bookData.languages || [],
-      languageCodes: bookData.languageCodes || [],
-      languageDetails: (bookData.languages || []).map((name, i) => ({
-        name,
-        code: (bookData.languageCodes || [])[i] ?? null,
-        isPrimary: i === 0,
-      })),
-      isAvailable: true,
-      createdAt: new Date()
+export async function POST(
+  request: NextRequest
+) {
+  try {
+    const client = await clientPromise;
+    const db = client.db("library");
+
+    const data =
+      (await request.json()) as BookCreate;
+
+    // Проверяем обязательные поля.
+    if (!data.title) {
+      return NextResponse.json(
+        {
+          error: "Название книги обязательно",
+        },
+        {
+          status: 400,
+        }
+      );
     }
 
-    const result = await db.collection<Book>('books').insertOne(book)
-    return NextResponse.json({ _id: result.insertedId, ...book })
+    const book: Book = {
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const result = await db
+      .collection<Book>("books")
+      .insertOne(book);
+
+    // Синхронизируем теги и языки
+    // после добавления книги.
+    await syncReferenceData();
+
+    return NextResponse.json(
+      {
+        _id: result.insertedId,
+        ...book,
+      },
+      {
+        status: 201,
+      }
+    );
   } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error(
+      "Create book error:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error: "Internal Server Error",
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }
