@@ -3,6 +3,7 @@ import { ObjectId } from "mongodb";
 import clientPromise from "@/lib/db";
 import { Book, BookCreate, buildLanguageDetails } from "@/lib/models/Book";
 import { syncReferenceData } from "@/lib/syncReferenceData";
+import { upsertBookRow } from "@/lib/googleSheets";
 
 // GET /api/books?q=...&tag=...&lang=...
 //
@@ -226,6 +227,10 @@ export async function POST(
     // Синхронизируем теги и языки
     // после добавления книги.
     await syncReferenceData();
+
+    // Отражаем новую книгу в Google Таблице
+    // (не блокирует ответ при ошибке синка).
+    await upsertBookRow({ ...book, _id: result.insertedId });
 
     return NextResponse.json(
       {
