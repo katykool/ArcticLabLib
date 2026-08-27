@@ -34,6 +34,7 @@ export function BookCard({ book }: BookCardProps) {
   const [showBorrowForm, setShowBorrowForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [titleExpanded, setTitleExpanded] = useState(false);
   const router = useRouter();
 
   const handleBorrowClick = async () => {
@@ -144,7 +145,13 @@ export function BookCard({ book }: BookCardProps) {
         <CardHeader
           className={book.isUserBook ? "bg-blue-50/30 rounded-t-lg" : ""}
         >
-          <CardTitle className="text-lg font-semibold line-clamp-2">
+          <CardTitle
+            onClick={() => setTitleExpanded((prev) => !prev)}
+            className={`text-lg font-semibold cursor-pointer select-none ${
+              titleExpanded ? "" : "line-clamp-2"
+            }`}
+            title={titleExpanded ? "Свернуть название" : "Показать полностью"}
+          >
             {book.title}
           </CardTitle>
         </CardHeader>
