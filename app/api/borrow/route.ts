@@ -14,17 +14,36 @@ export async function POST(request: NextRequest) {
     const borrowDate = new Date(borrowData.borrowDate)
     const dueDate = new Date(borrowData.dueDate)
 
-    // Проверяем, не превышает ли пользователь лимит в 3 книги
+    // Проверяем, не превышает ли пользователь лимит в 3 книги.
+    // Учитываем и 'active', и 'overdue' — иначе после того как книга
+    // становится просроченной, она переставала бы учитываться в лимите
+    // и пользователь мог бы набрать новых книг, не вернув старые.
     const activeBorrows = await db
       .collection<Borrow>('borrows')
       .countDocuments({
         userId: new ObjectId(borrowData.userId),
-        status: 'active'
+        status: { $in: ['active', 'overdue'] }
       })
 
     if (activeBorrows >= 3) {
       return NextResponse.json(
         { error: 'Вы не можете взять больше 3 книг одновременно' },
+        { status: 400 }
+      )
+    }
+
+    // Отдельно блокируем новую заявку, если есть хотя бы одна просроченная
+    // книга — сначала нужно её вернуть.
+    const overdueCount = await db
+      .collection<Borrow>('borrows')
+      .countDocuments({
+        userId: new ObjectId(borrowData.userId),
+        status: 'overdue'
+      })
+
+    if (overdueCount > 0) {
+      return NextResponse.json(
+        { error: 'У вас есть просроченная книга. Пожалуйста, верните её, прежде чем брать новую.' },
         { status: 400 }
       )
     }

@@ -578,39 +578,68 @@ export default function AdminContent({ user }: AdminContentProps) {
                         </div>
 
                         {/* Информация о текущем держателе */}
-                        {!book.isAvailable && book.currentHolder && (
-                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md w-full">
-                            <h4 className="font-medium text-amber-800 mb-2 flex items-center">
-                              <User className="h-4 w-4 mr-2" />
-                              Книга выдана:
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                              <div className="flex flex-wrap">
-                                <strong>Читатель:</strong>{" "}
-                                {book.currentHolder.userName}
-                              </div>
-                              <div className="flex items-center flex-wrap">
-                                <Mail className="h-3 w-3 mr-1" />
-                                <strong>Email:</strong>{" "}
-                                {book.currentHolder.userEmail}
-                              </div>
-                              {book.currentHolder.userTelegram && (
-                                <div className="flex flex-wrap">
-                                  <strong>Telegram:</strong>{" "}
-                                  {book.currentHolder.userTelegram}
-                                </div>
-                              )}
-                              <div className="flex items-center flex-wrap">
-                                <Calendar className="h-3 w-3 mr-1" />
-                                <strong>Вернуть до:</strong>{" "}
-                                {format(
-                                  new Date(book.currentHolder.dueDate),
-                                  "dd.MM.yyyy"
+                        {!book.isAvailable && book.currentHolder && (() => {
+                          const isOverdue =
+                            new Date(book.currentHolder.dueDate).getTime() <
+                            Date.now();
+                          return (
+                            <div
+                              className={`mt-3 p-3 rounded-md w-full border ${
+                                isOverdue
+                                  ? "bg-red-50 border-red-300"
+                                  : "bg-amber-50 border-amber-200"
+                              }`}
+                            >
+                              <h4
+                                className={`font-medium mb-2 flex items-center ${
+                                  isOverdue ? "text-red-800" : "text-amber-800"
+                                }`}
+                              >
+                                <User className="h-4 w-4 mr-2" />
+                                Книга выдана:
+                                {isOverdue && (
+                                  <Badge
+                                    variant="destructive"
+                                    className="ml-2"
+                                  >
+                                    Просрочено
+                                  </Badge>
                                 )}
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                <div className="flex flex-wrap">
+                                  <strong>Читатель:</strong>{" "}
+                                  {book.currentHolder.userName}
+                                </div>
+                                <div className="flex items-center flex-wrap">
+                                  <Mail className="h-3 w-3 mr-1" />
+                                  <strong>Email:</strong>{" "}
+                                  {book.currentHolder.userEmail}
+                                </div>
+                                {book.currentHolder.userTelegram && (
+                                  <div className="flex flex-wrap">
+                                    <strong>Telegram:</strong>{" "}
+                                    {book.currentHolder.userTelegram}
+                                  </div>
+                                )}
+                                <div
+                                  className={`flex items-center flex-wrap ${
+                                    isOverdue
+                                      ? "text-red-700 font-medium"
+                                      : ""
+                                  }`}
+                                >
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  <strong>Вернуть до:</strong>{" "}
+                                  {format(
+                                    new Date(book.currentHolder.dueDate),
+                                    "dd.MM.yyyy"
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
+                          );
+                        })()}
                       </>
                     )}
                   </div>

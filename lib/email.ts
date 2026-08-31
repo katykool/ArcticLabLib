@@ -71,43 +71,61 @@ export async function sendOverdueNotification(borrow: any) {
 }
 
 export async function checkOverdueBooks() {
-  try {
-    const client = await import('./db').then(mod => mod.default)
-    const db = (await client).db('library')
-    const today = new Date()
+  const client = await import('./db').then(mod => mod.default)
+  const db = (await client).db('library')
+  const today = new Date()
 
-    const overdueBorrows = await db.collection('borrows').aggregate([
-      {
-        $match: {
-          status: 'active',
-          dueDate: { $lt: today }
-        }
-      },
-      {
-        $lookup: {
-          from: 'books',
-          localField: 'bookId',
-          foreignField: '_id',
-          as: 'book'
-        }
-      },
-      {
-        $unwind: '$book'
+  // Свежепросроченные (ещё 'active', срок уже прошёл) — по ним шлём
+  // письмо и переводим в 'overdue'. Записи, уже помеченные 'overdue',
+  // сюда не попадают повторно, поэтому письмо уходит один раз.
+  const newlyOverdueBorrows = await db.collection('borrows').aggregate([
+    {
+      $match: {
+        status: 'active',
+        dueDate: { $lt: today }
       }
-    ]).toArray()
+    },
+    {
+      $lookup: {
+        from: 'books',
+        localField: 'bookId',
+        foreignField: '_id',
+        as: 'book'
+      }
+    },
+    {
+      $unwind: '$book'
+    }
+  ]).toArray()
 
-    for (const borrow of overdueBorrows) {
+  let notified = 0
+  let failed = 0
+
+  for (const borrow of newlyOverdueBorrows) {
+    try {
       await sendOverdueNotification(borrow)
-      
-      // Обновляем статус на просроченный
-      await db.collection('borrows').updateOne(
-        { _id: borrow._id },
-        { $set: { status: 'overdue' } }
-      )
+      notified++
+    } catch (error) {
+      // Не даём одному упавшему письму остановить обработку остальных
+      console.error(`Failed to send overdue notification for borrow ${borrow._id}:`, error)
+      failed++
     }
 
-    console.log(`Checked overdue books: ${overdueBorrows.length} overdue`)
-  } catch (error) {
-    console.error('Error checking overdue books:', error)
+    // Статус переводим в любом случае — иначе при следующем запуске
+    // мы бесконечно будем пытаться слать письмо по одной и той же записи
+    await db.collection('borrows').updateOne(
+      { _id: borrow._id },
+      { $set: { status: 'overdue' } }
+    )
   }
+
+  const summary = {
+    checkedAt: today.toISOString(),
+    newlyOverdue: newlyOverdueBorrows.length,
+    notified,
+    failed
+  }
+
+  console.log(`Checked overdue books:`, summary)
+  return summary
 }

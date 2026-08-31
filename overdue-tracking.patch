@@ -1,0 +1,279 @@
+diff --git a/app/api/borrow/route.ts b/app/api/borrow/route.ts
+index c3792e7..affb7a9 100644
+--- a/app/api/borrow/route.ts
++++ b/app/api/borrow/route.ts
+@@ -14,12 +14,15 @@ export async function POST(request: NextRequest) {
+     const borrowDate = new Date(borrowData.borrowDate)
+     const dueDate = new Date(borrowData.dueDate)
+ 
+-    // Проверяем, не превышает ли пользователь лимит в 3 книги
++    // Проверяем, не превышает ли пользователь лимит в 3 книги.
++    // Учитываем и 'active', и 'overdue' — иначе после того как книга
++    // становится просроченной, она переставала бы учитываться в лимите
++    // и пользователь мог бы набрать новых книг, не вернув старые.
+     const activeBorrows = await db
+       .collection<Borrow>('borrows')
+       .countDocuments({
+         userId: new ObjectId(borrowData.userId),
+-        status: 'active'
++        status: { $in: ['active', 'overdue'] }
+       })
+ 
+     if (activeBorrows >= 3) {
+@@ -29,6 +32,22 @@ export async function POST(request: NextRequest) {
+       )
+     }
+ 
++    // Отдельно блокируем новую заявку, если есть хотя бы одна просроченная
++    // книга — сначала нужно её вернуть.
++    const overdueCount = await db
++      .collection<Borrow>('borrows')
++      .countDocuments({
++        userId: new ObjectId(borrowData.userId),
++        status: 'overdue'
++      })
++
++    if (overdueCount > 0) {
++      return NextResponse.json(
++        { error: 'У вас есть просроченная книга. Пожалуйста, верните её, прежде чем брать новую.' },
++        { status: 400 }
++      )
++    }
++
+     // Находим книгу с полной информацией
+     const book = await db
+       .collection('books')
+diff --git a/app/api/cron/check-overdue/route.ts b/app/api/cron/check-overdue/route.ts
+new file mode 100644
+index 0000000..1fce890
+--- /dev/null
++++ b/app/api/cron/check-overdue/route.ts
+@@ -0,0 +1,28 @@
++import { NextRequest, NextResponse } from 'next/server'
++import { checkOverdueBooks } from '@/lib/email'
++
++// Этот эндпоинт вызывается по расписанию (см. vercel.json -> crons).
++// Он ищет все выдачи со статусом 'active', у которых dueDate уже прошёл,
++// шлёт читателю письмо-напоминание и переводит статус в 'overdue'.
++//
++// Защищён секретом CRON_SECRET, чтобы эндпоинт нельзя было дёргать извне.
++// Vercel Cron автоматически добавляет заголовок
++// Authorization: Bearer $CRON_SECRET, если переменная задана в проекте.
++export async function GET(request: NextRequest) {
++  const authHeader = request.headers.get('authorization')
++
++  if (
++    process.env.CRON_SECRET &&
++    authHeader !== `Bearer ${process.env.CRON_SECRET}`
++  ) {
++    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
++  }
++
++  try {
++    const result = await checkOverdueBooks()
++    return NextResponse.json({ success: true, ...result })
++  } catch (error) {
++    console.error('Cron check-overdue error:', error)
++    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
++  }
++}
+diff --git a/components/AdminContent.tsx b/components/AdminContent.tsx
+index a7eacda..abc2117 100644
+--- a/components/AdminContent.tsx
++++ b/components/AdminContent.tsx
+@@ -578,39 +578,68 @@ export default function AdminContent({ user }: AdminContentProps) {
+                         </div>
+ 
+                         {/* Информация о текущем держателе */}
+-                        {!book.isAvailable && book.currentHolder && (
+-                          <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md w-full">
+-                            <h4 className="font-medium text-amber-800 mb-2 flex items-center">
+-                              <User className="h-4 w-4 mr-2" />
+-                              Книга выдана:
+-                            </h4>
+-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+-                              <div className="flex flex-wrap">
+-                                <strong>Читатель:</strong>{" "}
+-                                {book.currentHolder.userName}
+-                              </div>
+-                              <div className="flex items-center flex-wrap">
+-                                <Mail className="h-3 w-3 mr-1" />
+-                                <strong>Email:</strong>{" "}
+-                                {book.currentHolder.userEmail}
+-                              </div>
+-                              {book.currentHolder.userTelegram && (
++                        {!book.isAvailable && book.currentHolder && (() => {
++                          const isOverdue =
++                            new Date(book.currentHolder.dueDate).getTime() <
++                            Date.now();
++                          return (
++                            <div
++                              className={`mt-3 p-3 rounded-md w-full border ${
++                                isOverdue
++                                  ? "bg-red-50 border-red-300"
++                                  : "bg-amber-50 border-amber-200"
++                              }`}
++                            >
++                              <h4
++                                className={`font-medium mb-2 flex items-center ${
++                                  isOverdue ? "text-red-800" : "text-amber-800"
++                                }`}
++                              >
++                                <User className="h-4 w-4 mr-2" />
++                                Книга выдана:
++                                {isOverdue && (
++                                  <Badge
++                                    variant="destructive"
++                                    className="ml-2"
++                                  >
++                                    Просрочено
++                                  </Badge>
++                                )}
++                              </h4>
++                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                 <div className="flex flex-wrap">
+-                                  <strong>Telegram:</strong>{" "}
+-                                  {book.currentHolder.userTelegram}
++                                  <strong>Читатель:</strong>{" "}
++                                  {book.currentHolder.userName}
++                                </div>
++                                <div className="flex items-center flex-wrap">
++                                  <Mail className="h-3 w-3 mr-1" />
++                                  <strong>Email:</strong>{" "}
++                                  {book.currentHolder.userEmail}
+                                 </div>
+-                              )}
+-                              <div className="flex items-center flex-wrap">
+-                                <Calendar className="h-3 w-3 mr-1" />
+-                                <strong>Вернуть до:</strong>{" "}
+-                                {format(
+-                                  new Date(book.currentHolder.dueDate),
+-                                  "dd.MM.yyyy"
++                                {book.currentHolder.userTelegram && (
++                                  <div className="flex flex-wrap">
++                                    <strong>Telegram:</strong>{" "}
++                                    {book.currentHolder.userTelegram}
++                                  </div>
+                                 )}
++                                <div
++                                  className={`flex items-center flex-wrap ${
++                                    isOverdue
++                                      ? "text-red-700 font-medium"
++                                      : ""
++                                  }`}
++                                >
++                                  <Calendar className="h-3 w-3 mr-1" />
++                                  <strong>Вернуть до:</strong>{" "}
++                                  {format(
++                                    new Date(book.currentHolder.dueDate),
++                                    "dd.MM.yyyy"
++                                  )}
++                                </div>
+                               </div>
+                             </div>
+-                          </div>
+-                        )}
++                          );
++                        })()}
+                       </>
+                     )}
+                   </div>
+diff --git a/lib/email.ts b/lib/email.ts
+index 994e5bd..610b3f6 100644
+--- a/lib/email.ts
++++ b/lib/email.ts
+@@ -71,43 +71,61 @@ export async function sendOverdueNotification(borrow: any) {
+ }
+ 
+ export async function checkOverdueBooks() {
+-  try {
+-    const client = await import('./db').then(mod => mod.default)
+-    const db = (await client).db('library')
+-    const today = new Date()
++  const client = await import('./db').then(mod => mod.default)
++  const db = (await client).db('library')
++  const today = new Date()
+ 
+-    const overdueBorrows = await db.collection('borrows').aggregate([
+-      {
+-        $match: {
+-          status: 'active',
+-          dueDate: { $lt: today }
+-        }
+-      },
+-      {
+-        $lookup: {
+-          from: 'books',
+-          localField: 'bookId',
+-          foreignField: '_id',
+-          as: 'book'
+-        }
+-      },
+-      {
+-        $unwind: '$book'
++  // Свежепросроченные (ещё 'active', срок уже прошёл) — по ним шлём
++  // письмо и переводим в 'overdue'. Записи, уже помеченные 'overdue',
++  // сюда не попадают повторно, поэтому письмо уходит один раз.
++  const newlyOverdueBorrows = await db.collection('borrows').aggregate([
++    {
++      $match: {
++        status: 'active',
++        dueDate: { $lt: today }
++      }
++    },
++    {
++      $lookup: {
++        from: 'books',
++        localField: 'bookId',
++        foreignField: '_id',
++        as: 'book'
+       }
+-    ]).toArray()
++    },
++    {
++      $unwind: '$book'
++    }
++  ]).toArray()
+ 
+-    for (const borrow of overdueBorrows) {
++  let notified = 0
++  let failed = 0
++
++  for (const borrow of newlyOverdueBorrows) {
++    try {
+       await sendOverdueNotification(borrow)
+-      
+-      // Обновляем статус на просроченный
+-      await db.collection('borrows').updateOne(
+-        { _id: borrow._id },
+-        { $set: { status: 'overdue' } }
+-      )
++      notified++
++    } catch (error) {
++      // Не даём одному упавшему письму остановить обработку остальных
++      console.error(`Failed to send overdue notification for borrow ${borrow._id}:`, error)
++      failed++
+     }
+ 
+-    console.log(`Checked overdue books: ${overdueBorrows.length} overdue`)
+-  } catch (error) {
+-    console.error('Error checking overdue books:', error)
++    // Статус переводим в любом случае — иначе при следующем запуске
++    // мы бесконечно будем пытаться слать письмо по одной и той же записи
++    await db.collection('borrows').updateOne(
++      { _id: borrow._id },
++      { $set: { status: 'overdue' } }
++    )
++  }
++
++  const summary = {
++    checkedAt: today.toISOString(),
++    newlyOverdue: newlyOverdueBorrows.length,
++    notified,
++    failed
+   }
++
++  console.log(`Checked overdue books:`, summary)
++  return summary
+ }
+\ No newline at end of file
