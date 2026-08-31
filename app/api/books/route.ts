@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
     const tagParam = searchParams.get("tag") || "";
     const langParam = searchParams.get("lang") || "";
 
-    const userEmail = request.headers.get("email");
+    const userEmail =
+    request.cookies.get("user_email")?.value ||
+    request.headers.get("email");
 
     // Преобразуем строки:
     // "история,научпоп" -> ["история", "научпоп"]
@@ -96,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     // Админ получает больше книг.
     // Обычный пользователь получает 8.
-    const limit = isAdmin ? 100 : 8;
+    const limit = isAdmin ? 0 : 8;
 
     const books = await db
       .collection<Book>("books")
