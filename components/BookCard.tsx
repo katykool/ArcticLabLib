@@ -1,9 +1,7 @@
 "use client";
 
 import { Book } from "@/lib/models/Book";
-
 import { Button } from "@/components/ui/button";
-
 import {
   Card,
   CardContent,
@@ -11,9 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-
 import { Badge } from "@/components/ui/badge";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,15 +20,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
 import { BorrowForm } from "./BorrowForm";
-
 import { useState } from "react";
-
 import { toast } from "sonner";
-
 import { useRouter } from "next/navigation";
-
 import { Calendar, Loader2 } from "lucide-react";
 
 interface BookCardProps {
@@ -91,7 +82,7 @@ export function BookCard({
 
       const user = await userResponse.json();
 
-      // Сначала находим запись о выдаче
+      // Находим запись о выдаче
       const borrowsResponse = await fetch(
         `/api/borrow?bookId=${book._id}&userId=${user._id}`
       );
@@ -105,9 +96,11 @@ export function BookCard({
       const borrows =
         await borrowsResponse.json();
 
+      // Ищем как обычную, так и просроченную выдачу
       const activeBorrow = borrows.find(
         (borrow: any) =>
-          borrow.status === "active"
+          borrow.status === "active" ||
+          borrow.status === "overdue"
       );
 
       if (!activeBorrow) {
@@ -161,18 +154,18 @@ export function BookCard({
   };
 
   const getButtonState = () => {
-    // Используем информацию из book.isUserBook,
-    // которая пришла с сервера
+    // Книга доступна — можно взять
     if (book.isAvailable) {
       return {
         text: "Взять книгу",
         disabled: false,
         action: handleBorrowClick,
-        variant:
-          "default" as const,
+        variant: "default" as const,
       };
     }
 
+    // Книга выдана текущему пользователю —
+    // можно вернуть
     if (book.isUserBook) {
       return {
         text: loading
@@ -180,17 +173,16 @@ export function BookCard({
           : "Вернуть книгу",
         disabled: loading,
         action: handleReturnClick,
-        variant:
-          "outline" as const,
+        variant: "outline" as const,
       };
     }
 
+    // Книга выдана другому пользователю
     return {
       text: "Недоступна",
       disabled: true,
       action: () => {},
-      variant:
-        "secondary" as const,
+      variant: "secondary" as const,
     };
   };
 
@@ -199,16 +191,14 @@ export function BookCard({
 
   // Форматируем дату возврата
   const formattedDueDate = dueDate
-    ? new Date(
-        dueDate
-      ).toLocaleDateString(
+    ? new Date(dueDate).toLocaleDateString(
         "ru-RU"
       )
     : null;
 
   // Проверяем, просрочена ли книга
   const isOverdue =
-    dueDate &&
+    !!dueDate &&
     new Date(dueDate).getTime() <
       Date.now();
 
@@ -329,65 +319,57 @@ export function BookCard({
             )}
           </div>
 
-          {/* Срок возврата показываем только владельцу книги */}
-          {book.isUserBook &&
-            formattedDueDate && (
+          {/* Срок возврата текущей книги */}
+          {formattedDueDate && (
+            <div
+              className={`mt-3 rounded-lg border p-3 ${
+                isOverdue
+                  ? "border-red-300 bg-red-50"
+                  : "border-blue-200 bg-blue-50"
+              }`}
+            >
               <div
-                className={`mt-3 rounded-lg border p-3 ${
+                className={`flex items-center gap-2 text-sm font-medium ${
                   isOverdue
-                    ? "border-red-300 bg-red-50"
-                    : "border-blue-200 bg-blue-50"
+                    ? "text-red-700"
+                    : "text-blue-700"
                 }`}
               >
-                <div
-                  className={`flex items-center gap-2 text-sm font-medium ${
-                    isOverdue
-                      ? "text-red-700"
-                      : "text-blue-700"
-                  }`}
-                >
-                  <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4" />
 
-                  <span>
-                    {isOverdue
-                      ? "🔴 Книга просрочена"
-                      : "📅 Вернуть до:"}
-                  </span>
-                </div>
-
-                <div
-                  className={`mt-1 text-base font-semibold ${
-                    isOverdue
-                      ? "text-red-800"
-                      : "text-blue-800"
-                  }`}
-                >
-                  {formattedDueDate}
-                </div>
-
-                {isOverdue && (
-                  <div className="mt-1 text-xs text-red-700">
-                    Пожалуйста, верните
-                    книгу как можно
-                    скорее.
-                  </div>
-                )}
+                <span>
+                  {isOverdue
+                    ? "🔴 Книга просрочена"
+                    : "📅 Вернуть до:"}
+                </span>
               </div>
-            )}
+
+              <div
+                className={`mt-1 text-base font-semibold ${
+                  isOverdue
+                    ? "text-red-800"
+                    : "text-blue-800"
+                }`}
+              >
+                {formattedDueDate}
+              </div>
+
+              {isOverdue && (
+                <div className="mt-1 text-xs text-red-700">
+                  Пожалуйста, верните книгу
+                  как можно скорее.
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
 
         <CardFooter>
           <Button
-            onClick={
-              buttonState.action
-            }
-            disabled={
-              buttonState.disabled
-            }
+            onClick={buttonState.action}
+            disabled={buttonState.disabled}
             className="w-full transition-all duration-200"
-            variant={
-              buttonState.variant
-            }
+            variant={buttonState.variant}
             size="lg"
           >
             {buttonState.text}
@@ -397,9 +379,7 @@ export function BookCard({
 
       {/* Диалог подтверждения возврата */}
       <AlertDialog
-        open={
-          showReturnDialog
-        }
+        open={showReturnDialog}
         onOpenChange={
           setShowReturnDialog
         }
@@ -452,9 +432,7 @@ export function BookCard({
         <BorrowForm
           book={book}
           onClose={() =>
-            setShowBorrowForm(
-              false
-            )
+            setShowBorrowForm(false)
           }
         />
       )}
