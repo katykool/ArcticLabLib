@@ -38,7 +38,7 @@ export async function sendEmailNotification({ to, subject, text, html }: EmailOp
 export async function sendOverdueNotification(borrow: any) {
   const dueDate = borrow.dueDate instanceof Date ? borrow.dueDate : new Date(borrow.dueDate)
   const book = borrow.book || {}
-  
+
   const subject = 'Просрочка возврата книги'
   const text = `Уважаемый ${borrow.userName},\n\nВы не вернули книгу "${book.title}" вовремя. Пожалуйста, верните книгу как можно скорее.\n\nДата возврата: ${dueDate.toLocaleDateString('ru-RU')}`
 
@@ -62,12 +62,48 @@ export async function sendOverdueNotification(borrow: any) {
     </div>
   `
 
-  return sendEmailNotification({
+  await sendEmailNotification({
     to: borrow.userEmail,
     subject,
     text,
     html,
   })
+
+  // Отдельно уведомляем администратора — письмо читателю выше не даёт
+  // об этом знать администратору, а библиотеке нужно отслеживать
+  // просроченные книги централизованно.
+  if (process.env.ADMIN_EMAIL) {
+    const adminSubject = `Книга просрочена: "${book.title}"`
+    const adminText = `Читатель ${borrow.userName} (${borrow.userEmail}) не вернул книгу "${book.title}" вовремя. Срок возврата был: ${dueDate.toLocaleDateString('ru-RU')}.`
+
+    const adminHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #dc2626;">Книга просрочена</h2>
+        <p><strong>Читатель:</strong> ${borrow.userName}</p>
+        <p><strong>Email:</strong> ${borrow.userEmail}</p>
+        <p><strong>Telegram:</strong> ${borrow.userTelegram || 'не указан'}</p>
+        <hr>
+        <p><strong>Книга:</strong> "${book.title}"</p>
+        <p><strong>Автор:</strong> ${book.author || 'не указан'}</p>
+        <p><strong>Издательство и год:</strong> ${book.publisher_year || 'не указано'}</p>
+        <p><strong>Срок возврата был:</strong> ${dueDate.toLocaleDateString('ru-RU')}</p>
+        <p>Читателю уже отправлено напоминание, новые книги ему выдать нельзя, пока он не вернёт эту.</p>
+      </div>
+    `
+
+    try {
+      await sendEmailNotification({
+        to: process.env.ADMIN_EMAIL,
+        subject: adminSubject,
+        text: adminText,
+        html: adminHtml,
+      })
+    } catch (error) {
+      // Не даём сбою письма администратору сорвать основной процесс —
+      // читатель уже уведомлён, это лишь дополнительное оповещение.
+      console.error('Failed to send admin overdue notification:', error)
+    }
+  }
 }
 
 export async function checkOverdueBooks() {
