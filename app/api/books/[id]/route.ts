@@ -43,8 +43,15 @@ export async function PUT(
 
     // Синхронизируем обновлённую книгу с Google Sheets
     if (updatedBook) {
-      await upsertBookRow(updatedBook)
-    }
+      console.log('SYNC TO SHEETS: starting', updatedBook._id.toString())
+
+      try {
+        await upsertBookRow(updatedBook)
+        console.log('SYNC TO SHEETS: success', updatedBook._id.toString())
+      } catch (error) {
+        console.error('SYNC TO SHEETS: FAILED', error)
+      }
+}
 
     return NextResponse.json({ success: true })
   } catch (error) {
