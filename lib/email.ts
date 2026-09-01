@@ -39,13 +39,13 @@ export async function sendOverdueNotification(borrow: any) {
   const dueDate = borrow.dueDate instanceof Date ? borrow.dueDate : new Date(borrow.dueDate)
   const book = borrow.book || {}
 
-  const subject = 'Просрочка возврата книги'
-  const text = `Уважаемый ${borrow.userName},\n\nВы не вернули книгу "${book.title}" вовремя. Пожалуйста, верните книгу как можно скорее.\n\nДата возврата: ${dueDate.toLocaleDateString('ru-RU')}`
+  const subject = 'Истёк срок пользования книгой'
+  const text = `Здравствуйте, ${borrow.userName}!\n\nВы не вернули книгу "${book.title}" вовремя. Пожалуйста, верните книгу как можно скорее.\n\nДата возврата: ${dueDate.toLocaleDateString('ru-RU')}`
 
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
       <h2 style="color: #dc2626;">Просрочка возврата книги</h2>
-      <p>Уважаемый ${borrow.userName},</p>
+      <p>Здравствуйте, ${borrow.userName}!</p>
       <p>Вы не вернули книгу <strong>"${book.title}"</strong> вовремя. Пожалуйста, верните книгу как можно скорее.</p>
       
       <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 15px 0;">
@@ -58,7 +58,7 @@ export async function sendOverdueNotification(borrow: any) {
       
       <p><strong>Дата возврата:</strong> ${dueDate.toLocaleDateString('ru-RU')}</p>
       <br>
-      <p>С уважением,<br>Библиотека</p>
+      <p>С уважением,<br>Библиотека Арктической лаборатории</p>
     </div>
   `
 
