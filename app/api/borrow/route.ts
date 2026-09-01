@@ -136,11 +136,13 @@ export async function GET(request: NextRequest) {
     let filter = {}
 
     if (bookId && userId) {
-      // Ищем активную выдачу для конкретной книги и пользователя
+      // Ищем выдачу для конкретной книги и пользователя — учитываем и
+      // 'active', и 'overdue', иначе просроченную книгу нельзя будет
+      // вернуть (BookCard ищет запись именно по этому эндпоинту).
       filter = {
         bookId: new ObjectId(bookId),
         userId: new ObjectId(userId),
-        status: 'active'
+        status: { $in: ['active', 'overdue'] }
       }
     } else if (userId) {
       // Ищем все выдачи пользователя
