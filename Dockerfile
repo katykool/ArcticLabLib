@@ -21,6 +21,11 @@ FROM node:24-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
+# curl нужен для ручной диагностики через Dokploy Terminal
+# и на случай, если задачи Schedule выполняются внутри этого контейнера.
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && rm -rf /var/lib/apt/lists/*
+
 # Непривилегированный пользователь для запуска приложения
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs
